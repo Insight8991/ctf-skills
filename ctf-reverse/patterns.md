@@ -50,6 +50,7 @@
 - [Signal-Based Binary Exploration](#signal-based-binary-exploration)
 - [Malware Anti-Analysis Bypass via Patching](#malware-anti-analysis-bypass-via-patching)
 - [Multi-Stage Shellcode Loaders](#multi-stage-shellcode-loaders)
+- [Embedded ZIP + XOR License Decryption (MetaCTF 2026)](#embedded-zip--xor-license-decryption-metactf-2026)
 - [Timing Side-Channel Attack](#timing-side-channel-attack)
 
 ---
@@ -675,6 +676,58 @@ for pos in range(flag_length):
         io.close()
     flag += best_char
 ```
+
+---
+
+## Embedded ZIP + XOR License Decryption (MetaCTF 2026)
+
+**Pattern (License To Rev):** Binary requires a license file as argument. Contains an embedded ZIP archive with the expected license, and an XOR-encrypted flag.
+
+**Recognition:**
+- `strings` reveals `EMBEDDED_ZIP` and `ENCRYPTED_MESSAGE` symbols
+- Binary is not stripped — `nm` or `readelf -s` shows data symbols in `.rodata`
+- `file` shows PIE executable, source file named `licensed.c`
+
+**Analysis workflow:**
+1. **Find data symbols:**
+```bash
+readelf -s binary | grep -E "EMBEDDED|ENCRYPTED|LICENSE"
+# EMBEDDED_ZIP at offset 0x2220, 384 bytes
+# ENCRYPTED_MESSAGE at offset 0x21e0, 35 bytes
+```
+
+2. **Extract embedded ZIP:**
+```python
+import struct
+with open('binary', 'rb') as f:
+    data = f.read()
+# Find PK\x03\x04 magic in .rodata
+zip_start = data.find(b'PK\x03\x04')
+# Extract ZIP (size from symbol table or until next symbol)
+open('embedded.zip', 'wb').write(data[zip_start:zip_start+384])
+```
+
+3. **Extract license from ZIP:**
+```bash
+unzip embedded.zip  # Contains license.txt
+```
+
+4. **XOR decrypt the flag:**
+```python
+license = open('license.txt', 'rb').read()
+enc_msg = open('encrypted_msg.bin', 'rb').read()  # Extract from .rodata
+flag = bytes(a ^ b for a, b in zip(enc_msg, license))
+print(flag.decode())
+```
+
+**Key insight:** No need to run the binary or bypass the expiry date check. The embedded ZIP and encrypted message are both in `.rodata` — extract and XOR offline.
+
+**Disassembly confirms:**
+- `memcmp(user_license, decompressed_embedded_zip, size)` — license validation
+- Date parsing with `sscanf("%d-%d-%d")` on `EXPIRY_DATE=` field
+- XOR loop: `ENCRYPTED_MESSAGE[i] ^ license[i]` → `putc()` per byte
+
+**Lesson:** When a binary has named symbols (`EMBEDDED_*`, `ENCRYPTED_*`), extract data directly from the binary without execution. XOR with known plaintext (the license) is trivially reversible.
 
 ---
 

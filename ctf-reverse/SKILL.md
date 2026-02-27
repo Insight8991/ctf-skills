@@ -290,6 +290,10 @@ Binary adds/subtracts position index; reverse by undoing per-index offset. See [
 
 Input converted to hex, compared against constant. Decode with `xxd -r -p`. See [patterns.md](patterns.md#hex-encoded-string-comparison).
 
+## Embedded ZIP + XOR License Decryption
+
+Binary with named symbols (`EMBEDDED_ZIP`, `ENCRYPTED_MESSAGE`) in `.rodata` → extract ZIP containing license, XOR encrypted message with license bytes to recover flag. No execution needed. See [patterns.md](patterns.md#embedded-zip--xor-license-decryption-metactf-2026).
+
 ## Stack String Deobfuscation (.rodata XOR Blob)
 
 Binary mmaps `.rodata` blob, XOR-deobfuscates, uses it to validate input. Reimplement verification loop with pyelftools to extract blob. Look for `0x9E3779B9`, `0x85EBCA6B` constants and `rol32()`. See [patterns.md](patterns.md#stack-string-deobfuscation-from-rodata-xor-blob-nullcon-2026).

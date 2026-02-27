@@ -9,6 +9,7 @@
 - [Social Media General Tips](#social-media-general-tips)
 - [Multi-Platform OSINT Chain](#multi-platform-osint-chain)
 - [MetaCTF OSINT Challenge Patterns](#metactf-osint-challenge-patterns)
+- [Unicode Homoglyph Steganography on BlueSky (MetaCTF 2026)](#unicode-homoglyph-steganography-on-bluesky-metactf-2026)
 - [Discord API Enumeration](#discord-api-enumeration)
 
 ---
@@ -145,6 +146,73 @@ Platforms that return 200 but no real profile:
 - Cross-platform username correlation
 - Visual inspection of all profile images at max resolution
 - Song lyric identification -> artist/song as flag component
+
+## Unicode Homoglyph Steganography on BlueSky (MetaCTF 2026)
+
+**Pattern (Skybound Secrets):** Flag hidden in a Bluesky post using Unicode homoglyph steganography — visually identical characters from different Unicode blocks encode binary data.
+
+**Detection:**
+- Post text looks normal but character-by-character analysis reveals non-ASCII codepoints
+- Characters from Cyrillic (`а` U+0430 vs `a` U+0061), Greek, Armenian, Mathematical Monospace, etc.
+- Each character encodes 1 bit: ASCII = 0, homoglyph = 1
+
+**Bluesky API search workflow:**
+```bash
+# Search for posts about the CTF
+curl -s "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=metactf+flash+ctf&sort=latest" | jq '.posts[].record.text'
+
+# Search for specific accounts
+curl -s "https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q=metactf" | jq '.actors[].handle'
+
+# Get profile
+curl -s "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=metactf.bsky.social" | jq
+
+# Get author feed (all posts)
+curl -s "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=metactf.bsky.social&limit=50" | jq '.feed[].post.record.text'
+
+# Get post thread (including replies)
+curl -s "https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at://did:plc:.../app.bsky.feed.post/..." | jq
+```
+
+**Decoding homoglyph steganography:**
+```python
+def decode_homoglyph_stego(text):
+    bits = []
+    for ch in text:
+        if ch in ('\u2019',):  # Platform auto-inserted right single quote
+            continue  # Skip, not intentional homoglyph
+        if ord(ch) < 128:
+            bits.append(0)  # Standard ASCII
+        else:
+            bits.append(1)  # Unicode homoglyph = 1 bit
+
+    # Group into bytes (MSB first)
+    flag = ''
+    for i in range(0, len(bits) - 7, 8):
+        byte_val = 0
+        for j in range(8):
+            byte_val = (byte_val << 1) | bits[i + j]
+        flag += chr(byte_val)
+    return flag
+```
+
+**Common homoglyph pairs:**
+| ASCII | Homoglyph | Unicode Block |
+|-------|-----------|---------------|
+| `a` (U+0061) | `а` (U+0430) | Cyrillic |
+| `o` (U+006F) | `о` (U+043E) | Cyrillic |
+| `e` (U+0065) | `е` (U+0435) | Cyrillic |
+| `s` (U+0073) | `ѕ` (U+0455) | Cyrillic DZE |
+| `t` (U+0074) | `𝚝` (U+1D69D) | Math Monospace |
+| `p` (U+0070) | `р` (U+0440) | Cyrillic |
+
+**Key lessons:**
+- Check ALL replies to official CTF posts, not just the main post
+- Platform auto-formatting (smart quotes `'` → `'`) must be excluded from bit encoding
+- Hints like "hype comes with its own secrets" suggest steganography in the social media posts themselves
+- Bluesky public API requires no authentication — use `public.api.bsky.app`
+
+---
 
 ## Discord API Enumeration
 

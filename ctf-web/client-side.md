@@ -17,6 +17,7 @@
 - [Shadow DOM XSS](#shadow-dom-xss)
 - [DOM Clobbering + MIME Mismatch](#dom-clobbering-mime-mismatch)
 - [HTTP Request Smuggling via Cache Proxy](#http-request-smuggling-via-cache-proxy)
+- [CSS/JS Paywall Bypass](#cssjs-paywall-bypass)
 - [JSFuck Decoding](#jsfuck-decoding)
 
 ---
@@ -200,6 +201,29 @@ outer_req = (
     f"\r\n"
 ).encode() + inner_req
 ```
+
+---
+
+## CSS/JS Paywall Bypass
+
+**Pattern (Great Paywall, MetaCTF 2026):** Article content is fully present in the HTML but hidden behind a CSS/JS overlay (`position: fixed; z-index: 99999; backdrop-filter: blur(...)` with a "Subscribe" CTA).
+
+**Quick solve:** `curl` the page — no CSS/JS rendering means the full article (and flag) are in the raw HTML.
+
+```bash
+curl -s https://target/article | grep -i "flag\|CTF{"
+```
+
+**Alternative approaches:**
+- View page source in browser (Ctrl+U)
+- Browser DevTools → delete the overlay element
+- Disable JavaScript in browser settings
+- `document.querySelector('#paywall-overlay').remove()` in console
+- Googlebot user-agent: `curl -H "User-Agent: Googlebot" https://target/article`
+
+**Key insight:** Many paywalls are client-side DOM overlays — the content is always in the HTML. The leetspeak hint "paywalls are just DOM" confirms this. Always try `curl` or view-source first before more complex approaches.
+
+**Detection:** Look for `<div>` elements with `position: fixed`, high `z-index`, and `backdrop-filter: blur()` in the page source — these are overlay-based paywalls.
 
 ---
 

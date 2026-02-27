@@ -241,6 +241,10 @@ Upload ZIP containing `.php` file → extract to web-accessible dir → `file_ge
 
 Linear XOR-based signing with secret blocks → recover from known pairs → forge for target. See [auth-and-access.md](auth-and-access.md#custom-linear-macsignature-forgery-nullcon-2026).
 
+## CSS/JS Paywall Bypass
+
+Content behind CSS overlay (`position: fixed; z-index: 99999`) is still in the raw HTML. `curl` or view-source bypasses it instantly. See [client-side.md](client-side.md#cssjs-paywall-bypass).
+
 ## Common Flag Locations
 
 ```

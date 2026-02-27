@@ -83,6 +83,8 @@ If your first approach doesn't work:
 - Reverse + Pwn: reverse the binary first, then exploit the vulnerability
 - Forensics + OSINT: recover data from dump, then trace it via public sources
 - Misc + Crypto: jail escape requires building crypto primitives under constraints
+- OSINT + Stego: social media posts with unicode homoglyph steganography (Cyrillic lookalikes encode bits)
+- Web + Forensics: paywall bypass (curl reveals content hidden by CSS overlays)
 
 ## Flag Formats
 
@@ -90,6 +92,11 @@ Flags vary by CTF. Common formats:
 - `flag{...}`, `FLAG{...}`, `CTF{...}`, `TEAM{...}`
 - Custom prefixes: check the challenge description or CTF rules for the format (e.g., `ENO{...}`, `HTB{...}`, `picoCTF{...}`)
 - Sometimes just a plaintext string with no wrapper
+
+**Validation rule (important):**
+- If you find multiple flag-like strings, treat them as candidates and validate before finalizing.
+- Prefer the token tied to the intended artifact/workflow (not random metadata noise or obvious decoys).
+- Do a corpus-wide uniqueness check and include the source file/path when reporting.
 
 ```bash
 # Search for common flag patterns in files

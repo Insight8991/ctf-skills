@@ -13,6 +13,7 @@
 - [VMDK Sparse Parsing (0xFun 2026)](#vmdk-sparse-parsing-0xfun-2026)
 - [Memory Dump String Carving (Pragyan 2026)](#memory-dump-string-carving-pragyan-2026)
 - [Memory Dump Malware Extraction + XOR (VuwCTF 2025)](#memory-dump-malware-extraction-xor-vuwctf-2025)
+- [Linux Ransomware Memory-Key Recovery (MetaCTF 2026)](#linux-ransomware-memory-key-recovery-metactf-2026)
 - [PowerShell Ransomware Analysis](#powershell-ransomware-analysis)
 
 ---
@@ -240,6 +241,62 @@ key = b"..."  # Large ASCII art string
 cipher = open('extracted.bin', 'rb').read()
 plaintext = bytes((b - 0x32) ^ key[i % len(key)] for i, b in enumerate(cipher))
 ```
+
+---
+
+## Linux Ransomware Memory-Key Recovery (MetaCTF 2026)
+
+**Pattern:** Linux memory dump + encrypted `.veg` files + `enc_key.bin`; ransomware uses hybrid crypto (AES for files, RSA-wrapped key). Volatility may fail process enumeration due symbol/KASLR mismatch.
+
+**Fast workflow:**
+1. **Confirm archive integrity before analysis.**
+```bash
+unzip -l encrypted_files.zip
+# Compare listed files/sizes vs extracted tree; re-extract cleanly if mismatch
+unzip -o encrypted_files.zip -d encrypted_full
+```
+
+2. **Reverse ransomware binary quickly to identify mode/layout.**
+```bash
+strings -a ransomware.elf | grep -E "enc_key|EVP_aes|PUBLIC KEY|.veg"
+objdump -d ransomware.elf | less
+```
+- Typical finding: `AES-256-OFB`, IV prepended to each `.veg`, global 32-byte AES key, RSA public key hardcoded.
+
+3. **Try Volatility normally, then pivot immediately if empty/unstable.**
+```bash
+vol -f memdump.raw linux.pslist
+vol -f memdump.raw linux.proc.Maps
+vol -f memdump.raw linux.vmayarascan
+```
+- If Linux plugins return empty/invalid output despite correct banner/symbols, do **raw-memory candidate scanning**.
+
+4. **Recover AES key via anchored candidate scan + magic validation.**
+- Use recurring anchor strings in memory (e.g., `/home/.../enc_key.bin`, HOME path).
+- Derive candidate offsets near anchors (page-aligned windows).
+- Test each 32-byte candidate by decrypting first blocks of multiple `.veg` files and checking magic bytes (`%PDF-`, `PK\x03\x04`, `\x89PNG\r\n\x1a\n`).
+- Keep candidates that satisfy multiple independent signatures.
+
+5. **Decrypt full dataset and verify output completeness.**
+```bash
+# OFB: iv = first 16 bytes, ciphertext starts at +16
+# Decrypt all *.veg recursively from a clean extraction directory
+```
+- Validate recovered file count against zip listing.
+- Watch for duplicated mirror trees (e.g., `snap/*/Downloads/...`) and deduplicate logically.
+
+6. **Defend against false flags.**
+- Treat metadata-only flags as suspicious until corroborated by challenge context.
+- Prefer tokens from primary project artifacts and perform uniqueness checks:
+```bash
+rg -n -a '[A-Za-z]+CTF\\{[^}]+\\}' recovered_full
+pdftotext recovered_full/**/*.pdf - 2>/dev/null | rg '[A-Za-z]+CTF\\{'
+```
+
+**Key lessons:**
+- Don’t trust a partial/stale extraction tree; re-extract zip cleanly.
+- In OFB ransomware, magic-byte validation is a fast key oracle.
+- A plausible `CTF{...}` in metadata can be a decoy; confirm with corpus-wide consistency.
 
 ---
 

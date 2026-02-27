@@ -12,6 +12,7 @@
 - [Email Headers](#email-headers)
 - [USB HID Stenography/Chord PCAP (UTCTF 2024)](#usb-hid-stenographychord-pcap-utctf-2024)
 - [BCD Encoding in UDP (VuwCTF 2025)](#bcd-encoding-in-udp-vuwctf-2025)
+- [HTTP File Upload Exfiltration in PCAP (MetaCTF 2026)](#http-file-upload-exfiltration-in-pcap-metactf-2026)
 - [NTLMv2 Hash Cracking from PCAP (Pragyan 2026)](#ntlmv2-hash-cracking-from-pcap-pragyan-2026)
 
 ---
@@ -248,6 +249,43 @@ def bcd_decode(data):
 ```
 
 **Lesson:** Challenge name often hints at encoding ratio or technique.
+
+---
+
+## HTTP File Upload Exfiltration in PCAP (MetaCTF 2026)
+
+**Pattern (Dead Drop):** Small PCAP with TCP streams containing HTTP traffic. Exfiltrated data uploaded as a file via multipart form POST.
+
+**Quick triage:**
+```bash
+# Count packets and protocols
+tshark -r capture.pcap -q -z io,phs
+
+# List HTTP requests
+tshark -r capture.pcap -Y "http.request" -T fields -e http.request.method -e http.request.uri -e http.host
+
+# Export all HTTP objects (files transferred)
+tshark -r capture.pcap --export-objects http,/tmp/http_objects
+ls -la /tmp/http_objects/
+
+# Follow specific TCP streams
+tshark -r capture.pcap -q -z "follow,tcp,ascii,0"
+tshark -r capture.pcap -q -z "follow,tcp,ascii,1"
+```
+
+**Extraction workflow:**
+1. Export HTTP objects — uploaded files are extracted automatically
+2. Check for multipart form-data POST requests (file uploads)
+3. Look for unusual User-Agent strings (e.g., `DeadDropBot/1.0`) indicating automated exfiltration
+4. Extracted files may be images (PNG/JPEG) with flag text rendered visually — open and inspect
+
+**Key indicators of exfiltration:**
+- POST to `/upload` endpoints
+- Non-standard User-Agent strings
+- Small number of packets but containing file transfers
+- "Dead drop" pattern: attacker uploads file to web server for later retrieval
+
+**Lesson:** Always start with `--export-objects` to extract transferred files before deep packet analysis. The flag is often in the exfiltrated file itself.
 
 ---
 
